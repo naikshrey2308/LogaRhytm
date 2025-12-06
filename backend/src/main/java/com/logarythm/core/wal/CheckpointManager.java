@@ -3,13 +3,12 @@ package com.logrhythm.core.wal;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
- * Manages checkpoint metadata for WAL cleanup and replay.
+ * Tracks which WAL files are safely flushed into segment storage.
  * 
- * checkpoint.meta file structure:
+ * Stored in data/wal/checkpoint.meta:
+ * 
  * lastFlushedWalIndex=5
  */
 @Component
@@ -27,23 +26,31 @@ public class CheckpointManager {
         return lastFlushedWalIndex;
     }
 
-    public synchronized void updateLastFlushedWalIndex(int index) {
+    /**
+     * Update checkpoint when segment flush succeeds.
+     */
+    public synchronized void updateCheckpoint(int index) {
         this.lastFlushedWalIndex = index;
         saveCheckpoint();
     }
 
     private void loadCheckpoint() {
         File file = new File(CHECKPOINT_FILE);
+
         if (!file.exists()) {
-            return; // No checkpoint yet = start from zero
+            System.out.println("CheckpointManager: No checkpoint found. Starting fresh.");
+            return;
         }
 
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line = reader.readLine();
+
             if (line != null && line.startsWith("lastFlushedWalIndex=")) {
                 this.lastFlushedWalIndex = Integer.parseInt(line.split("=")[1]);
             }
-            System.out.println("Checkpoint loaded: lastFlushedWalIndex=" + lastFlushedWalIndex);
+
+            System.out.println("CheckpointManager: Loaded checkpoint → " + lastFlushedWalIndex);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -53,12 +60,12 @@ public class CheckpointManager {
         File file = new File(CHECKPOINT_FILE);
         file.getParentFile().mkdirs();
 
-        try (FileWriter writer = new FileWriter(file, false)) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, false))) {
             writer.write("lastFlushedWalIndex=" + lastFlushedWalIndex);
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        System.out.println("Checkpoint updated → lastFlushedWalIndex=" + lastFlushedWalIndex);
+        System.out.println("CheckpointManager: Updated checkpoint → " + lastFlushedWalIndex);
     }
 }

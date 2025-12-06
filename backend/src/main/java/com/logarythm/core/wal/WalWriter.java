@@ -9,24 +9,17 @@ import java.io.IOException;
 
 /**
  * WAL = Write Ahead Log
- * WalWriter is responsible for writing all incoming logs
- * to an append-only Write-Ahead Log file for durability.
- *
- * This is a minimal implementation:
- * - Creates the WAL directory if missing
- * - Opens/creates wal-000001.log
- * - Appends raw log data (newline-delimited JSON for now)
- * - Handles basic file rotation when size exceeds threshold
+ * Responsible for durable append-only logging before segment writes.
  */
 @Component
 public class WalWriter {
 
     private static final String WAL_DIR = "data/wal";
-    private static final long MAX_WAL_SIZE_BYTES = 100 * 1024; // 100 KB
+    private static final long MAX_WAL_SIZE_BYTES = 200 * 1024; // 200 KB
 
     private File currentWalFile;
     private FileOutputStream walStream;
-    private int walIndex = 1;
+    private int walIndex = 1;  // used by SegmentWriter + CheckpointManager
 
     public WalWriter() throws IOException {
         initializeWalDirectory();
@@ -56,8 +49,7 @@ public class WalWriter {
     }
 
     /**
-     * Append a log entry to the WAL.
-     * For now, we serialize it as newline-delimited JSON.
+     * Append log to WAL (JSON lines for now).
      */
     public synchronized void append(LogEntry entry) throws IOException {
         rotateIfNeeded();
@@ -70,5 +62,12 @@ public class WalWriter {
         );
 
         walStream.write(json.getBytes());
+    }
+
+    /**
+     * Expose current WAL file index — used for checkpointing.
+     */
+    public int getCurrentWalIndex() {
+        return walIndex;
     }
 }

@@ -5,6 +5,7 @@ import com.logrhythm.model.LogEntry;
 import com.logrhythm.core.wal.WalWriter;
 import com.logrhythm.core.wal.WalCleaner;
 import com.logrhythm.core.wal.CheckpointManager;
+import com.logrhythm.core.storage.SegmentWriter;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -31,16 +32,20 @@ public class BatchFlusher {
     private final WalWriter walWriter;
     private final CheckpointManager checkpointManager;
     private final WalCleaner walCleaner;
+    private final SegmentWriter segmentWriter;
 
-    public BatchFlusher(IngestionService ingestionService, 
-                        WalWriter walWriter, 
+    public BatchFlusher(IngestionService ingestionService,
+                        WalWriter walWriter,
+                        WalCleaner walCleaner,
                         CheckpointManager checkpointManager,
-                        WalCleaner walCleaner) {
+                        SegmentWriter segmentWriter) {
         this.ingestionService = ingestionService;
         this.walWriter = walWriter;
         this.checkpointManager = checkpointManager;
+        this.segmentWriter = segmentWriter;
         this.walCleaner = walCleaner;
     }
+
 
     @PostConstruct
     public void startConsuming() {
@@ -59,20 +64,26 @@ public class BatchFlusher {
      * - append to WAL
      * - write to segment files
      * - update indexes
+     * - deletes old WAL files
      */
     private void flushBatch(List<LogEntry> batch) {
         try {
+            int walIndex = walWriter.getCurrentWalIndex();
+
+            // 1. Write WAL entries
             for (LogEntry entry : batch) {
                 walWriter.append(entry);
             }
 
-            System.out.println("WAL: wrote batch of size " + batch.size());
+            // 2. Write to segment storage
+            segmentWriter.writeBatchToSegment(walIndex, batch);
 
-            // TODO: When segment dumper writes segments, update and cleanup
-            // checkpointManager.updateLastFlushedWalIndex(...);
-            // walCleaner.cleanupOldWals(...);
+            // 3. CLEANUP OLD WAL FILES
+            walCleaner.cleanOldWalFiles();
 
-        } catch (IOException e) {
+            System.out.println("BatchFlusher: wrote batch=" + batch.size() + " walIndex=" + walIndex);
+
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

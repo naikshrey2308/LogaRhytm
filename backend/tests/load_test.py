@@ -10,7 +10,7 @@ URL = "http://localhost:8080/ingest"
 THREADS = 8
 
 # how long to run the test (seconds)
-TEST_DURATION = 10
+TEST_DURATION = 25
 
 # shared counter
 count = 0
