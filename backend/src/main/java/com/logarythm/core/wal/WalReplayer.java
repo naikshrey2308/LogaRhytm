@@ -38,6 +38,24 @@ public class WalReplayer {
         this.walCleaner = walCleaner;
     }
 
+    private LogEntry readBinaryRecord(InputStream in) throws IOException {
+        byte[] tsBytes = in.readNBytes(8);
+        if (tsBytes.length < 8) return null; // EOF
+        long timestamp = bytesToLong(tsBytes);
+
+        int levelByte = in.read();
+        if (levelByte < 0) return null;
+
+        byte[] lenBytes = in.readNBytes(2);
+        if (lenBytes.length < 2) return null;
+        int msgLen = bytesToShort(lenBytes);
+
+        byte[] msgBytes = in.readNBytes(msgLen);
+        if (msgBytes.length < msgLen) return null;
+
+        return new LogEntry(timestamp, decodeLevel(levelByte), new String(msgBytes, "UTF-8"));
+    }
+
     @PostConstruct
     public void replayPendingWalFiles() {
         int lastFlushed = checkpointManager.getLastFlushedWalIndex();
@@ -75,32 +93,20 @@ public class WalReplayer {
     private void replaySingleFile(File file, int walIndex) {
         System.out.println("WalReplayer: Replaying " + file.getName());
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-
+        try (InputStream in = new FileInputStream(file)) {
             List<LogEntry> batch = new ArrayList<>();
-            String line;
 
-            while ((line = reader.readLine()) != null) {
-                LogEntry entry = parseJsonLine(line);
+            LogEntry entry;
+            while ((entry = readBinaryRecord(in)) != null) {
                 batch.add(entry);
             }
 
             if (!batch.isEmpty()) {
                 segmentWriter.writeBatchToSegment(walIndex, batch);
-                System.out.println("WalReplayer: Replayed " + batch.size() + " logs from " + file.getName());
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private LogEntry parseJsonLine(String json) {
-        // extremely simple JSON parsing for now
-        long timestamp = Long.parseLong(json.split("\"timestamp\":")[1].split(",")[0]);
-        String level = json.split("\"level\":\"")[1].split("\"")[0];
-        String message = json.split("\"message\":\"")[1].split("\"")[0];
-        return new LogEntry(timestamp, level, message);
     }
 
     private int extractIndex(String filename) {
@@ -110,4 +116,33 @@ public class WalReplayer {
             return -1;
         }
     }
+
+    /**
+     * Helper Functions
+     */
+    private long bytesToLong(byte[] b) {
+        return ((long)(b[0] & 0xff) << 56) |
+            ((long)(b[1] & 0xff) << 48) |
+            ((long)(b[2] & 0xff) << 40) |
+            ((long)(b[3] & 0xff) << 32) |
+            ((long)(b[4] & 0xff) << 24) |
+            ((long)(b[5] & 0xff) << 16) |
+            ((long)(b[6] & 0xff) << 8)  |
+            ((long)(b[7] & 0xff));
+    }
+
+    private short bytesToShort(byte[] b) {
+        return (short)(((b[0] & 0xFF) << 8) | (b[1] & 0xFF));
+    }
+
+    private String decodeLevel(int lvl) {
+        return switch (lvl) {
+            case 1 -> "INFO";
+            case 2 -> "WARN";
+            case 3 -> "ERROR";
+            case 4 -> "DEBUG";
+            default -> "UNKNOWN";
+        };
+    }
+
 }

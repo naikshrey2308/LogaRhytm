@@ -71,9 +71,7 @@ public class BatchFlusher {
             int walIndex = walWriter.getCurrentWalIndex();
 
             // 1. Write WAL entries
-            for (LogEntry entry : batch) {
-                walWriter.append(entry);
-            }
+            walWriter.appendBatch(batch);
 
             // 2. Write to segment storage
             segmentWriter.writeBatchToSegment(walIndex, batch);

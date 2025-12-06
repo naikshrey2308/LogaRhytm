@@ -5,7 +5,11 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+
+import java.util.List;
 
 /**
  * WAL = Write Ahead Log
@@ -15,11 +19,12 @@ import java.io.IOException;
 public class WalWriter {
 
     private static final String WAL_DIR = "data/wal";
-    private static final long MAX_WAL_SIZE_BYTES = 200 * 1024; // 200 KB
+    private static final long MAX_WAL_SIZE_BYTES = 1024 * 1024; // 1 MB per WAL log file
 
     private File currentWalFile;
-    private FileOutputStream walStream;
-    private int walIndex = 1;  // used by SegmentWriter + CheckpointManager
+    private BufferedOutputStream walStream;
+    private FileOutputStream fileStream;
+    private int walIndex = 1;
 
     public WalWriter() throws IOException {
         initializeWalDirectory();
@@ -36,16 +41,39 @@ public class WalWriter {
     private void openNewWalFile() throws IOException {
         String filename = String.format("wal-%06d.log", walIndex);
         currentWalFile = new File(WAL_DIR, filename);
-        walStream = new FileOutputStream(currentWalFile, true);
-        System.out.println("WAL: Opened new WAL file " + currentWalFile.getName());
+
+        fileStream = new FileOutputStream(currentWalFile, true);
+        walStream = new BufferedOutputStream(fileStream, 64 * 1024); // 64KB buffer
+
+        System.out.println("WAL: Opened new WAL file " + filename);
     }
 
     private void rotateIfNeeded() throws IOException {
         if (currentWalFile.length() >= MAX_WAL_SIZE_BYTES) {
+            walStream.flush();
             walStream.close();
+            fileStream.close();
             walIndex++;
             openNewWalFile();
         }
+    }
+
+    public synchronized void appendBatch(List<LogEntry> batch) throws IOException {
+        rotateIfNeeded();
+
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream(batch.size() * 64);
+
+        for (LogEntry entry : batch) {
+            byte[] msgBytes = entry.message().getBytes("UTF-8");
+            int msgLen = msgBytes.length;
+
+            buffer.write(longToBytes(entry.timestamp()));
+            buffer.write(entry.levelAsByte());
+            buffer.write(shortToBytes((short) msgLen));
+            buffer.write(msgBytes);
+        }
+
+        walStream.write(buffer.toByteArray());
     }
 
     /**
@@ -54,14 +82,14 @@ public class WalWriter {
     public synchronized void append(LogEntry entry) throws IOException {
         rotateIfNeeded();
 
-        String json = String.format(
-                "{\"timestamp\":%d,\"level\":\"%s\",\"message\":\"%s\"}\n",
-                entry.timestamp(),
-                entry.level(),
-                entry.message().replace("\"", "\\\"")
-        );
+        byte[] msgBytes = entry.message().getBytes("UTF-8");
+        int msgLen = msgBytes.length;
 
-        walStream.write(json.getBytes());
+        // Write binary record
+        walStream.write(longToBytes(entry.timestamp()));
+        walStream.write(entry.levelAsByte());
+        walStream.write(shortToBytes((short) msgLen));
+        walStream.write(msgBytes);
     }
 
     /**
@@ -69,5 +97,24 @@ public class WalWriter {
      */
     public int getCurrentWalIndex() {
         return walIndex;
+    }
+
+    /**
+     * Helper Functions
+     */
+    private byte[] longToBytes(long value) {
+        byte[] bytes = new byte[8];
+        for (int i = 7; i >= 0; i--) {
+            bytes[i] = (byte) (value & 0xFF);
+            value >>= 8;
+        }
+        return bytes;
+    }
+
+    private byte[] shortToBytes(short value) {
+        return new byte[] {
+            (byte) ((value >> 8) & 0xFF),
+            (byte) (value & 0xFF)
+        };
     }
 }
