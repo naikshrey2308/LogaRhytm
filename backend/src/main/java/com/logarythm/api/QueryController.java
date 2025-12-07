@@ -15,8 +15,25 @@ public class QueryController {
         this.segmentReader = segmentReader;
     }
 
-    @GetMapping("/logs")
-    public List<LogEntry> getLastLogs(@RequestParam(defaultValue = "100") int limit) throws Exception {
-        return segmentReader.readLastNLogs(limit);
+    @GetMapping("/query")
+    public QueryResponse queryLogs(
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(required = false) Long start,
+            @RequestParam(required = false) Long end,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String message) throws Exception {
+
+        long t0 = System.currentTimeMillis();
+
+        List<LogEntry> results = segmentReader.queryLogs(
+                limit,
+                start,
+                end,
+                level,
+                message);
+
+        long took = System.currentTimeMillis() - t0;
+
+        return new QueryResponse(took, results.size(), results);
     }
 }

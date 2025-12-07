@@ -4,6 +4,7 @@ import com.logrhythm.model.LogEntry;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -13,54 +14,92 @@ public class SegmentReader {
 
     private static final String SEGMENT_DIR = "data/segments";
 
-    public List<LogEntry> readLastNLogs(int limit) throws IOException {
+    /**
+     * Unified log reader: applies limit, time range, level, and keyword search.
+     */
+    public List<LogEntry> queryLogs(Integer limit, Long start, Long end,
+            String levelFilter, String messageKeyword) throws IOException {
+
+        if (limit == null || limit <= 0)
+            limit = 100;
+        if (messageKeyword != null)
+            messageKeyword = messageKeyword.toLowerCase();
+
         File dir = new File(SEGMENT_DIR);
         File[] files = dir.listFiles((d, name) -> name.startsWith("segment-") && name.endsWith(".bin"));
+
         if (files == null || files.length == 0) {
             return List.of();
         }
 
-        // newest segment first
+        // newest → oldest
         List<File> segments = new ArrayList<>(List.of(files));
         segments.sort((a, b) -> b.getName().compareTo(a.getName()));
 
-        List<LogEntry> collected = new ArrayList<>();
+        List<LogEntry> collected = new ArrayList<>(limit);
 
-        for (File file : segments) {
+        for (File seg : segments) {
             if (collected.size() >= limit)
-                break; // already have enough
-            readSegmentForward(file, collected, limit);
+                break;
+            readSegment(seg, collected, limit, start, end, levelFilter, messageKeyword);
         }
 
-        // Sort by timestamp descending (newest first)
+        // sort results newest first (descending timestamps)
         collected.sort((a, b) -> Long.compare(b.timestamp(), a.timestamp()));
 
-        // Return only the last N newest logs
-        return collected.size() > limit ? collected.subList(0, limit) : collected;
+        if (collected.size() > limit)
+            return collected.subList(0, limit);
+
+        return collected;
     }
 
-    private void readSegmentForward(File file, List<LogEntry> out, int limit) throws IOException {
+    private void readSegment(File file, List<LogEntry> out, int limit,
+            Long start, Long end,
+            String levelFilter, String keyword) throws IOException {
+
         FileInputStream fis = new FileInputStream(file);
         DataInputStream dis = new DataInputStream(fis);
 
-        while (dis.available() > 0 && out.size() < limit) {
+        try {
+            while (out.size() < limit) {
 
-            long timestamp = dis.readLong();
-            byte lvl = dis.readByte();
-            int msgLen = dis.readUnsignedShort();
+                // Need at least 11 bytes for a full header
+                if (dis.available() < 11) {
+                    break; // stop cleanly
+                }
 
-            byte[] msg = new byte[msgLen];
-            dis.readFully(msg);
+                long ts = dis.readLong();
+                byte lvlByte = dis.readByte();
+                int msgLen = dis.readUnsignedShort();
 
-            out.add(new LogEntry(timestamp, decodeLevel(lvl), new String(msg, "UTF-8")));
+                // Validate msgLen before allocating
+                if (msgLen < 0 || msgLen > 10000) break;
 
-            // STOP immediately when limit hit
-            if (out.size() >= limit) {
-                break;
+                // Check body bytes
+                if (dis.available() < msgLen) break;
+
+                byte[] msgBytes = new byte[msgLen];
+                dis.readFully(msgBytes);
+
+                String msg = new String(msgBytes, StandardCharsets.UTF_8);
+                String lvl = decodeLevel(lvlByte);
+
+                // apply filters
+                if (start != null && ts < start)
+                    continue;
+                if (end != null && ts > end)
+                    continue;
+                if (levelFilter != null && !lvl.equalsIgnoreCase(levelFilter))
+                    continue;
+                if (keyword != null && !msg.toLowerCase().contains(keyword))
+                    continue;
+
+                out.add(new LogEntry(ts, lvl, msg));
             }
-        }
 
-        dis.close();
+        } finally {
+            dis.close();
+        }
     }
 
     private String decodeLevel(byte lvl) {
