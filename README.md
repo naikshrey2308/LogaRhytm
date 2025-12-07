@@ -2,7 +2,7 @@
 
 A lightweight, single-node log analytics engine built using **Java + Spring WebFlux**, featuring high‑throughput ingestion, durable Write‑Ahead Logging (WAL), segment‑based storage, and Bloom‑filter–accelerated search.
 
-This project showcases real systems‑design concepts used in log search engines like Loki, ClickHouse, and Elasticsearch—implemented from scratch in an interview‑ready, production‑inspired architecture.
+This project showcases real systems‑design concepts used in log search engines like Loki, ClickHouse, and Elasticsearch—implemented from scratch in a production‑inspired architecture.
 
 ---
 
@@ -20,14 +20,7 @@ This project showcases real systems‑design concepts used in log search engines
 
 ## 🏗️ High‑Level System Architecture (Simplified)
 
-```
-React UI
-   │
-   ├──>  /ingest  ──> Sink ──> Ingestion Pipeline ──> WAL ──> Segment Storage
-   │                                                       └──> Bloom Filters
-   │
-   └──>  /query   ────> Query Engine ──> Bloom Filters ──> Segment Scan ──> Results
-```
+![](/System_Architecture.jpg)
 
 ---
 
