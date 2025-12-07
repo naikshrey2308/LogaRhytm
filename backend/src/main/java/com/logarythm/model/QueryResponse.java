@@ -1,6 +1,4 @@
-package com.logrhythm.api;
-
-import com.logrhythm.model.LogEntry;
+package com.logarythm.model;
 
 import java.util.List;
 

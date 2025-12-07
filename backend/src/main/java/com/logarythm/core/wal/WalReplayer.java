@@ -1,7 +1,7 @@
-package com.logrhythm.core.wal;
+package com.logarythm.core.wal;
 
-import com.logrhythm.core.storage.SegmentWriter;
-import com.logrhythm.model.LogEntry;
+import com.logarythm.core.storage.SegmentWriter;
+import com.logarythm.model.LogEntry;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;

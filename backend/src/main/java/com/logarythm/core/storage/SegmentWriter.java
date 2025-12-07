@@ -1,8 +1,9 @@
-package com.logrhythm.core.storage;
+package com.logarythm.core.storage;
 
-import com.logrhythm.model.LogEntry;
-import com.logrhythm.core.wal.CheckpointManager;
+import com.logarythm.model.LogEntry;
+import com.logarythm.core.wal.CheckpointManager;
 import org.springframework.stereotype.Component;
+import com.logarythm.core.bloom.*;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -15,13 +16,13 @@ import java.io.IOException;
  * of logs into long-term storage files ("segments").
  *
  * Segments differ from WAL:
- *  - WAL is append-only durability
- *  - Segments are the final, queryable storage format
+ * - WAL is append-only durability
+ * - Segments are the final, queryable storage format
  *
  * For now:
- *  - We store newline-delimited JSON
- *  - We create a new segment when size > 5MB
- *  - We update checkpoint so WAL cleanup can start working
+ * - We store newline-delimited JSON
+ * - We create a new segment when size > 5MB
+ * - We update checkpoint so WAL cleanup can start working
  */
 @Component
 public class SegmentWriter {
@@ -30,6 +31,7 @@ public class SegmentWriter {
     private static final long MAX_SEGMENT_SIZE_BYTES = 10 * 1024 * 1024; // 1MB per segment
 
     private final CheckpointManager checkpointManager;
+    private SegmentBloomBuilder bloomBuilder = new SegmentBloomBuilder(16 * 1024 * 8, 4); // 16KB * 8 bits
 
     private File currentSegmentFile;
     private BufferedOutputStream segmentStream;
@@ -45,7 +47,8 @@ public class SegmentWriter {
 
     private void initializeSegmentDirectory() {
         File dir = new File(SEGMENT_DIR);
-        if (!dir.exists()) dir.mkdirs();
+        if (!dir.exists())
+            dir.mkdirs();
     }
 
     private void openNewSegmentFile() throws IOException {
@@ -74,9 +77,9 @@ public class SegmentWriter {
      * For now, JSON lines are acceptable.
      *
      * Later we replace this with:
-     *   - binary encoding
-     *   - compression
-     *   - indexed blocks
+     * - binary encoding
+     * - compression
+     * - indexed blocks
      */
     public synchronized void writeBatchToSegment(int walIndex, Iterable<LogEntry> batch) throws IOException {
         rotateIfNeeded();
@@ -103,7 +106,7 @@ public class SegmentWriter {
     /**
      * Helper Functions
      */
-        /**
+    /**
      * Helper Functions
      */
     private byte[] longToBytes(long value) {
@@ -117,8 +120,8 @@ public class SegmentWriter {
 
     private byte[] shortToBytes(short value) {
         return new byte[] {
-            (byte) ((value >> 8) & 0xFF),
-            (byte) (value & 0xFF)
+                (byte) ((value >> 8) & 0xFF),
+                (byte) (value & 0xFF)
         };
     }
 }

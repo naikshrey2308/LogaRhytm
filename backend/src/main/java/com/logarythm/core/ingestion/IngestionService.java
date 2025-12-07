@@ -1,6 +1,6 @@
-package com.logrhythm.core.ingestion;
+package com.logarythm.core.ingestion;
 
-import com.logrhythm.model.LogEntry;
+import com.logarythm.model.LogEntry;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 /**

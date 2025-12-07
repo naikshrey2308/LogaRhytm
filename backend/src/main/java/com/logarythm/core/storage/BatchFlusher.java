@@ -1,11 +1,11 @@
-package com.logrhythm.core.storage;
+package com.logarythm.core.storage;
 
-import com.logrhythm.core.ingestion.IngestionService;
-import com.logrhythm.model.LogEntry;
-import com.logrhythm.core.wal.WalWriter;
-import com.logrhythm.core.wal.WalCleaner;
-import com.logrhythm.core.wal.CheckpointManager;
-import com.logrhythm.core.storage.SegmentWriter;
+import com.logarythm.core.ingestion.IngestionService;
+import com.logarythm.model.LogEntry;
+import com.logarythm.core.wal.WalWriter;
+import com.logarythm.core.wal.WalCleaner;
+import com.logarythm.core.wal.CheckpointManager;
+import com.logarythm.core.storage.SegmentWriter;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;

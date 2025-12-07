@@ -1,4 +1,4 @@
-package com.logrhythm.core.wal;
+package com.logarythm.core.wal;
 
 import org.springframework.stereotype.Component;
 

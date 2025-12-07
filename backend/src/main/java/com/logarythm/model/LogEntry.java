@@ -1,7 +1,7 @@
-package com.logrhythm.model;
+package com.logarythm.model;
 
 /**
- * LogEntry represents a single log event ingested by LogRhythm.
+ * LogEntry represents a single log event ingested by logarythm.
  * It is intentionally minimal; other layers (WAL, encoding, indexing)
  * will work around this immutable record.
  */

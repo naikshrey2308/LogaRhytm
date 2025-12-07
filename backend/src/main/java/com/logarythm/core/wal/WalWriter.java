@@ -1,6 +1,6 @@
-package com.logrhythm.core.wal;
+package com.logarythm.core.wal;
 
-import com.logrhythm.model.LogEntry;
+import com.logarythm.model.LogEntry;
 import org.springframework.stereotype.Component;
 
 import java.io.File;

@@ -1,9 +1,10 @@
-package com.logrhythm.api;
+package com.logarythm.api;
 
-import com.logrhythm.core.storage.SegmentReader;
-import com.logrhythm.model.LogEntry;
+import com.logarythm.core.storage.SegmentReader;
+import com.logarythm.model.LogEntry;
+import com.logarythm.model.QueryResponse;
+
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
